@@ -1,6 +1,5 @@
-```markdown
 
-# 🌟 Project MyMaiB50 SDK 🌟
+🌟 Project MyMaiB50 SDK 🌟
 
 **专为 舞萌 DX (1.53 PRiSM) 打造的高性能本地数据拉取 SDK**
 
@@ -137,4 +136,5 @@ int main() {
 ```
 
 ```
+
 
