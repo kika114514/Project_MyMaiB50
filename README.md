@@ -1,144 +1,141 @@
-ProJect MyMaiB50 SDK
-Project MyMaiB50 是一款专为舞萌SDGB（Maimai DX 1.53版本）开发的B50拉取 SDK。
-本 SDK 底层采用 Rust 编写并编译为动态链接库（DLL），内置了完整的加解密拉取成绩流程。开发者只需提供微信扫码获取的SGWCMAID，即可静默拉取玩家的精简游戏档案（包含制作B50图标所需要的rating,头像，姓名和舞里程）与完整的 B50 成绩数据。
-核心特性
-●	底层安全通讯：完整封装当前版本通讯逻辑对外提供极简的 C-ABI 接口。
-●	跨语言兼容：完美支持 Python、C++、C# 等任何支持 FFI的语言。
-●	内存安全：SDK 内部维护独立的线程安全缓冲区，调用端无需手动管理内存释放。
-API 接口文档
-SDK 对外暴露出三个核心 C 函数。所有的字符串均采用 UTF-8 编码。
-1. int inputApi(const char* qr_code)
-功能：初始化玩家会话并进行服务器鉴权。
-●	参数：qr_code - 玩家在微信客户端内扫码截获的完整 URL 字符串。
-●	返回值：
-○	1 - 鉴权成功，底层 Token 已锁定，可开始拉取数据。
-○	0 - 鉴权失败（二维码无效、已过期，或账号处于 15 分钟锁定冷却期）。
-●	注意：必须在调用其余拉取数据的 API 之前调用此接口。
-2. const char* infoApi()
-功能：获取玩家的轻量级基础档案信息。
-●	返回值：返回一个指向 JSON 格式字符串的指针。
-●	JSON 结构示例：包含 userName (昵称), playerRating (底力分数), iconId (头像 ID), nameplateId (姓名框 ID) 等关键展示字段。
-3. const char* b50infoApi()
-功能：获取玩家的完整B50成绩单（用于计算 B50）及段位信息。
-●	返回值：返回一个指向 JSON 格式字符串的指针。包含新旧版本曲目的 RatingList、段位对战数据（udemae）等。
-________________________________________调用示例
-Python 调用示例 (基于 ctypes)
+```markdown
+<div align="center">
 
-Python
+# 🌟 Project MyMaiB50 SDK 🌟
 
+**专为 舞萌 DX (1.53 PRiSM) 打造的高性能本地数据拉取 SDK**
 
+</div>
+
+---
+
+## 📖 项目简介
+
+Project MyMaiB50 是一款底层采用 **Rust** 编写的高性能动态链接库 (DLL)。
+内置完整的 AES-256-CBC 加解密、Zlib 压缩解析与全自动的 Session 管理机制。无需繁琐的抓包配置，只需提供微信授权链接，即可静默、安全地拉取玩家的精简游戏档案与完整的 B50 成绩数据。
+
+## ✨ 核心特性
+
+- 🔒 **防线穿透**：底层完整封装 1.53 版本密码学、时间戳对齐与防重放机制。
+- ⚡ **跨语言兼容**：提供标准极简的 C-ABI 接口，完美兼容 Python、C++、C# 等多语言的 FFI 调用。
+- 🛡️ **内存安全**：内部独立维护线程安全的 Mutex 缓冲区，调用端无需手动管理指针与内存释放。
+
+---
+
+## 🧰 API 接口文档
+
+> **注意**：所有接口返回的字符串均采用 `UTF-8` 编码。DLL 导出的函数名大小写敏感。
+
+| 接口定义 | 功能说明 | 返回值 / 状态 |
+| :--- | :--- | :--- |
+| `int inputApi(const char* qr_code)` | 初始化玩家会话并进行网关与服务器鉴权 | `1` 成功 <br> `0` 失败 (二维码失效或 15 分钟冷却期) |
+| `const char* infoApi()` | 获取玩家轻量级基础档案 | 返回 JSON 指针 (含昵称、底力、头像ID、姓名框ID) |
+| `const char* b50infoApi()` | 获取玩家完整 B50 成绩与段位数据 | 返回 JSON 指针 (含新旧版本 RatingList、对战段位) |
+
+---
+
+## 💻 快速起步
+
+### 🐍 Python 调用示例 (基于 `ctypes`)
+
+```python
 import ctypes
-import json
 import os
 
 # 1. 加载 DLL
-# 请确保 maimai_sdk.dll 与本脚本在同级目录，或提供绝对路径
 dll_path = os.path.abspath("./PJMMB.dll")
 sdk = ctypes.CDLL(dll_path)
 
 # 2. 定义 C 接口的参数与返回类型
 sdk.inputApi.argtypes = [ctypes.c_char_p]
 sdk.inputApi.restype = ctypes.c_int
-
 sdk.infoApi.restype = ctypes.c_char_p
 sdk.b50infoApi.restype = ctypes.c_char_p
 
 def main():
-    qr_url = input("请输入二维码链接: ").strip()
+    qr_url = input("👉 请输入微信二维码链接: ").strip()
     
-    # 转换为字节流并调用鉴权接口
-    print("正在与服务器握手...")
-    status = sdk.inputApi(qr_url.encode('utf-8'))
-    
-    if status == 1:
-        print("鉴权成功！\n")
+    # 执行鉴权
+    if sdk.inputApi(qr_url.encode('utf-8')) == 1:
+        print("\n✅ 鉴权成功！\n")
         
-        # 拉取基础档案
-        info_ptr = sdk.infoApi()
-        info_json = info_ptr.decode('utf-8')
+        # 提取轻量档案
         print("[基础档案]")
-        print(info_json)
+        print(sdk.infoApi().decode('utf-8'))
         
-        # 拉取 B50 成绩数据
-        b50_ptr = sdk.b50infoApi()
-        b50_json = b50_ptr.decode('utf-8')
-        
-        # 成绩数据较大，建议保存至本地文件
+        # 提取并保存 B50 数据
+        b50_json = sdk.b50infoApi().decode('utf-8')
         with open("b50_result.json", "w", encoding="utf-8") as f:
             f.write(b50_json)
-        print("\n[B50 数据] 已成功保存至 b50_result.json")
-        
+            
+        print("\n✅ [B50 数据] 已成功保存至 b50_result.json")
     else:
-        print("鉴权失败。请检查二维码是否过期，或账号是否处于 15 分钟保护期。")
+        print("\n❌ 鉴权失败：二维码无效，或账号正处于 15 分钟保护冷却期。")
 
 if __name__ == "__main__":
     main()
 
-C++ 调用示例 (基于 Windows.h)
+```
 
-C++
+### 🪟 C++ 调用示例 (基于 `Windows.h`)
 
-
+```cpp
 #include <iostream>
 #include <windows.h>
 #include <string>
 
-// 定义函数指针类型
 typedef int (*InputApiFunc)(const char*);
 typedef const char* (*InfoApiFunc)();
 
 int main() {
-    // 1. 动态加载 DLL
+    // 动态加载 DLL
     HMODULE hDll = LoadLibraryA("PJMMB.dll");
     if (!hDll) {
-        std::cerr << "无法加载 PJMMB.dll，请检查文件路径。" << std::endl;
+        std::cerr << "DLL 加载失败！请检查文件路径。" << std::endl;
         return 1;
     }
 
-    // 2. 获取函数地址
     InputApiFunc inputApi = (InputApiFunc)GetProcAddress(hDll, "inputApi");
     InfoApiFunc infoApi = (InfoApiFunc)GetProcAddress(hDll, "infoApi");
     InfoApiFunc b50infoApi = (InfoApiFunc)GetProcAddress(hDll, "b50infoApi");
 
-    if (!inputApi || !infoApi || !b50infoApi) {
-        std::cerr << "无法在 DLL 中定位 API 入口点。" << std::endl;
-        FreeLibrary(hDll);
-        return 1;
-    }
-
-    // 3. 执行业务逻辑
     std::string qrUrl;
-    std::cout << "请输入二维码链接: ";
+    std::cout << "👉 请输入二维码链接: ";
     std::getline(std::cin, qrUrl);
 
     if (inputApi(qrUrl.c_str()) == 1) {
-        std::cout << "鉴权成功！" << std::endl;
-
-        // 获取并打印轻量级信息
-        const char* infoResult = infoApi();
-        std::cout << "\n[玩家档案]:\n" << infoResult << std::endl;
-
-        // 获取 B50 信息
-        const char* b50Result = b50infoApi();
-        std::cout << "\n[B50 数据拉取完成，长度]: " << strlen(b50Result) << " bytes" << std::endl;
+        std::cout << "\n✅ 鉴权成功！" << std::endl;
+        std::cout << "\n[玩家档案]:\n" << infoApi() << std::endl;
+        std::cout << "\n[B50 数据]: 成功拉取 " << strlen(b50infoApi()) << " bytes" << std::endl;
     } else {
-        std::cerr << "鉴权失败，请确保二维码有效且账号未被锁定。" << std::endl;
+        std::cerr << "\n❌ 鉴权失败：二维码失效或处于保护期。" << std::endl;
     }
 
-    // 4. 释放资源
     FreeLibrary(hDll);
     return 0;
 }
 
-注意事项与已知限制
-1.	15分钟在线保护锁：当您成功通过 inputApi 调用并拉取数据后，服务器会将该账号标记为“在线状态”。在随后的 15 分钟内，该账号无法再次通过二维码进行外部登录或登录机台进行游玩，强行拉取会导致 inputApi 返回 0。请在开发测试时妥善规划请求频率。
-2.	指针生命周期：infoApi 和 b50infoApi 返回的 const char* 指针指向 DLL 内部维护的静态互斥锁内存（Mutex）。请勿在调用端尝试 free 或 delete 该指针。下次调用对应 API 时，该内存区域的数据会被自动覆写。
-3.	有关拉取数据:当b50数据拉取后，头部的rating为sega的石山代码，显示零是正常的，真正的rating要用info api获取，会按照b1-50顺序排列，"achievement"为成绩，"level"为歌曲难度，0为绿，1为黄，2为红以此类推，"musicId"为歌曲id，"romVersion"为歌曲加入时的游戏版本号，拉取的b50数据末尾的udemae为友人对战等级胜负场等数据
-写在结尾:本sdk的创立初衷是为了方便开发者制作bot的B50查分工具，并不是为舞萌科技而生，cdk已经经过编译期字符串混淆加密，且一切有关与服务器通讯等操作均在cdk内部执行，可保证核心数据不会遭受泄露，还是那句话
-怕别用，用别怕
+```
 
+---
 
-作者bili：https://space.bilibili.com/2037838752
-QQ:3898181826
-如有侵犯您的权益，请联系我关闭仓库
-看到这了，点个star呗
+## ⚠️ 使用限制与已知特性
+
+1. **15分钟在线保护锁**：当成功通过 `inputApi` 拉取数据后，服务器会将该账号标记为“在线机台状态”。在随后的 **15 分钟**内，该账号无法再次通过外部鉴权，强制操作将直接返回失败。请妥善规划请求频率。
+2. **指针生命周期**：接口返回的 `const char*` 指针指向 DLL 内部维持的静态内存。**请勿在调用端尝试 `free` 或 `delete` 该指针**，这会导致进程崩溃。下次调用时内存会自动覆写。
+
+---
+
+## ⚖️ 授权与免责声明
+
+**Freeware License & Strict Disclaimer**
+
+* 本项目仅供技术研究、学习与交流使用。
+* **严禁**将本 SDK 用于任何形式的商业盈利、高频爬虫或破坏原版游戏服务器公平性与稳定性的行为。
+* **严禁**对二进制文件 `PJMMB.dll` 进行反编译或逆向工程。
+* 本项目为个人非官方开发，与 SEGA (世嘉)、Wahlap (华立科技) 及其相关品牌无任何关联。
+* **风险自负**：作者不对使用本项目产生的任何后果（包括但不限于账号封禁、数据丢失、法律纠纷）承担任何直接或间接的责任。
+
+```
+
+```
